@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>信州マルシェ テレアポ管理ボード</title>
+<style>
+:root{
+  --pine:#1f5c40;
+  --pine-dark:#164531;
+  --pine-soft:#e7efe9;
+  --harvest:#d98a2b;
+  --harvest-soft:#f7ecdb;
+  --paper:#f5f7f3;
+  --card:#ffffff;
+  --ink:#1b241e;
+  --ink-soft:#5c6a60;
+  --line:#dde3dd;
+  --line-soft:#eaeee9;
+  --ok:#2f8f5b;
+  --warn:#c9821f;
+  --mute:#8a968c;
+  --bad:#c0503f;
+  --shadow:0 1px 2px rgba(20,40,30,.05),0 6px 20px rgba(20,40,30,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",Meiryo,sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  font-size:14px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:14px}
+h1,h2,h3,h4{margin:0;font-weight:700}
+a{color:var(--pine)}
+
+.gate{position:fixed;inset:0;background:var(--pine-dark);display:flex;align-items:center;justify-content:center;z-index:100;padding:24px}
+.gate-box{background:var(--card);border-radius:16px;padding:32px;width:100%;max-width:360px;box-shadow:var(--shadow);text-align:center}
+.gate-box h2{color:var(--pine);margin-bottom:6px}
+.gate-box p{color:var(--ink-soft);margin:0 0 18px;font-size:13px}
+.gate-box input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:12px;text-align:center;letter-spacing:2px}
+.gate-box button{width:100%;padding:11px;border:none;border-radius:10px;background:var(--pine);color:#fff;font-weight:700}
+.gate-err{color:var(--bad);font-size:12px;height:16px;margin-bottom:8px}
+
+header.top{background:linear-gradient(120deg,var(--pine),var(--pine-dark));color:#fff;padding:18px 22px 0}
+.top-inner{max-width:1180px;margin:0 auto}
+.brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand .mark{width:34px;height:34px;border-radius:9px;background:var(--harvest);display:flex;align-items:center;justify-content:center;font-size:19px;flex:0 0 auto}
+.brand h1{font-size:19px;letter-spacing:.5px}
+.brand .sub{font-size:12px;color:#cfe3d6;font-weight:400}
+.sync{margin-left:auto;font-size:12px;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.12);padding:6px 11px;border-radius:20px}
+.sync .dot{width:8px;height:8px;border-radius:50%;background:#8fd6a8}
+.sync.saving .dot{background:var(--harvest)}
+.sync.local .dot{background:#b9c4bd}
+
+nav.tabs{display:flex;gap:2px;max-width:1180px;margin:16px auto 0;overflow-x:auto}
+nav.tabs button{background:transparent;border:none;color:#d5e6db;padding:11px 15px;font-size:14px;font-weight:600;border-bottom:3px solid transparent;white-space:nowrap;border-radius:8px 8px 0 0}
+nav.tabs button.active{color:#fff;border-bottom-color:var(--harvest);background:rgba(255,255,255,.08)}
+
+main{max-width:1180px;margin:0 auto;padding:24px 22px 60px}
+.view{display:none}
+.view.active{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+.section-title{font-size:15px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.section-title .tag{font-size:11px;font-weight:700;color:var(--harvest);background:var(--harvest-soft);padding:2px 8px;border-radius:20px}
+
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.kpi{padding:18px 18px 16px;position:relative;overflow:hidden}
+.kpi .label{font-size:12px;color:var(--ink-soft);font-weight:600}
+.kpi .num{font-size:32px;font-weight:800;line-height:1.1;margin-top:6px;letter-spacing:-.5px}
+.kpi .unit{font-size:14px;font-weight:600;color:var(--ink-soft);margin-left:2px}
+.kpi .foot{font-size:11px;color:var(--mute);margin-top:2px}
+.kpi.accent .num{color:var(--pine)}
+.kpi.harvest .num{color:var(--harvest)}
+.kpi .bar{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--pine)}
+.kpi.harvest .bar{background:var(--harvest)}
+.kpi.warn .bar{background:var(--warn)}
+.kpi.mute .bar{background:var(--mute)}
+
+.grid2{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}
+.pad{padding:18px}
+
+.followrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line-soft)}
+.followrow:last-child{border-bottom:none}
+.followrow .fdate{font-size:12px;font-weight:700;padding:4px 9px;border-radius:8px;background:var(--harvest-soft);color:var(--harvest);flex:0 0 auto}
+.followrow .fdate.over{background:#f7dfda;color:var(--bad)}
+.followrow .fmain{flex:1;min-width:0}
+.followrow .fmain b{font-size:14px}
+.followrow .fmeta{font-size:12px;color:var(--ink-soft)}
+.empty{color:var(--mute);font-size:13px;padding:18px 0;text-align:center}
+
+form .field{margin-bottom:14px}
+form label{display:block;font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:5px}
+form input,form select,form textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+form input:focus,form select:focus,form textarea:focus{outline:none;border-color:var(--pine);box-shadow:0 0 0 3px var(--pine-soft)}
+form textarea{resize:vertical;min-height:58px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.btn{padding:11px 18px;border:none;border-radius:10px;background:var(--pine);color:#fff;font-weight:700;font-size:14px}
+.btn:hover{background:var(--pine-dark)}
+.btn.full{width:100%}
+.btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.btn.ghost:hover{background:var(--paper)}
+.btn.harvest{background:var(--harvest)}
+.btn.harvest:hover{background:#c07a22}
+.btn.danger{background:#fff;border:1px solid #ecccc5;color:var(--bad)}
+.btn.sm{padding:6px 12px;font-size:12px}
+
+#rejectBlock{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px;display:none}
+#rejectBlock.show{display:block}
+
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.filters select,.filters input{padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#fff}
+.filters input{min-width:150px}
+
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:11px;color:var(--ink-soft);font-weight:700;padding:9px 10px;border-bottom:2px solid var(--line);white-space:nowrap;background:var(--paper)}
+td{padding:10px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+tr:hover td{background:#fafcfa}
+.pref-chip{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap}
+.status{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-block}
+.st-seiyaku{background:#dcefe3;color:var(--ok)}
+.st-positive{background:#e6f0f6;color:#2b6ea3}
+.st-consider{background:#eef0e4;color:#7a8a3a}
+.st-hold{background:#f3edda;color:#a07a1e}
+.st-absent{background:#eceeec;color:#6f7a71}
+.st-reject{background:#f7e1dc;color:var(--bad)}
+.st-na{background:#ececec;color:#8a8a8a}
+.rowdel{color:var(--mute);border:none;background:none;font-size:15px;padding:2px 6px;border-radius:6px}
+.rowdel:hover{background:#f7e1dc;color:var(--bad)}
+
+.rank-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:20px}
+.rank-card{padding:18px}
+.rank-card h3{font-size:14px;margin-bottom:4px}
+.rank-card .desc{font-size:11px;color:var(--mute);margin-bottom:14px}
+.rank-item{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line-soft)}
+.rank-item:last-child{border-bottom:none}
+.medal{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:0 0 auto;background:var(--paper);color:var(--ink-soft)}
+.medal.g1{background:linear-gradient(135deg,#f6d365,#e0a92a);color:#5a3d00}
+.medal.g2{background:linear-gradient(135deg,#e4e7ea,#b9c0c7);color:#3d4750}
+.medal.g3{background:linear-gradient(135deg,#e7c39a,#c98f5a);color:#5a3312}
+.rank-item .rname{flex:1;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank-item .rval{font-weight:800;color:var(--pine)}
+.rank-item .rval small{font-weight:600;color:var(--mute);font-size:11px}
+
+.bars .bar-row{margin-bottom:12px}
+.bars .bar-head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+.bars .bar-head .bv{font-weight:700;color:var(--ink-soft)}
+.bars .track{height:12px;background:var(--line-soft);border-radius:8px;overflow:hidden}
+.bars .fill{height:100%;border-radius:8px;background:var(--pine);transition:width .5s ease}
+.bars .fill.h{background:var(--harvest)}
+.bars .fill.r{background:var(--bad)}
+
+.pref-map{display:flex;flex-direction:column;gap:14px}
+.pref-region h4{font-size:12px;color:var(--pine);margin-bottom:8px;border-left:3px solid var(--harvest);padding-left:8px}
+.pref-cells{display:flex;flex-wrap:wrap;gap:7px}
+.pref-cell{font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--mute);display:flex;align-items:center;gap:6px}
+.pref-cell b{color:var(--ink);font-weight:700}
+.pref-cell.hit{border-color:var(--pine);background:var(--pine-soft);color:var(--pine)}
+.pref-cell .cnt{font-size:11px;font-weight:800;background:var(--pine);color:#fff;border-radius:20px;padding:0 6px;min-width:18px;text-align:center}
+
+.ap-add{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.ap-add input{flex:1;min-width:180px;padding:10px 11px;border:1px solid var(--line);border-radius:10px}
+.ap-list{display:flex;flex-direction:column;gap:8px}
+.ap-row{display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--line);border-radius:11px}
+.ap-row .av{width:32px;height:32px;border-radius:50%;background:var(--pine-soft);color:var(--pine);display:flex;align-items:center;justify-content:center;font-weight:800;flex:0 0 auto}
+.ap-row .an{flex:1;font-weight:700}
+.ap-row .as{font-size:12px;color:var(--mute)}
+
+.set-block{padding:18px;margin-bottom:18px}
+.set-block h3{font-size:14px;margin-bottom:6px}
+.set-block p{font-size:13px;color:var(--ink-soft);margin:0 0 12px}
+.set-block code{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:12px}
+.set-actions{display:flex;gap:10px;flex-wrap:wrap}
+.hint{font-size:12px;color:var(--mute);margin-top:6px}
+.badge-demo{background:var(--harvest-soft);color:var(--harvest);font-size:12px;font-weight:700;padding:8px 14px;border-radius:10px;margin-bottom:18px;display:flex;align-items:center;gap:8px}
+
+.cat-chip{display:inline-block;font-size:10px;font-weight:700;color:var(--pine);background:var(--pine-soft);padding:1px 7px;border-radius:5px;margin-bottom:3px}
+footer.credit{text-align:center;padding:22px;color:var(--mute);font-size:12px;border-top:1px solid var(--line);background:#fff}
+footer.credit b{color:var(--ink-soft);font-weight:700;letter-spacing:.3px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.3s;z-index:200}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:860px){
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .grid2{grid-template-columns:1fr}
+  .rank-grid{grid-template-columns:1fr}
+}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<div class="gate" id="gate" style="display:none">
+  <div class="gate-box">
+    <h2>信州マルシェ テレアポ管理</h2>
+    <p>営業部専用ボード</p>
+    <div class="gate-err" id="gateErr"></div>
+    <input type="password" id="gateInput" placeholder="パスワード" autocomplete="off">
+    <button id="gateBtn">開く</button>
+  </div>
+</div>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <div class="mark">🏔️</div>
+      <div>
+        <h1>信州マルシェ テレアポ管理ボード</h1>
+        <div class="sub">株式会社MONDOCOLO 営業部 ／ 会場獲得コール</div>
+      </div>
+      <div class="sync local" id="sync"><span class="dot"></span><span id="syncText">ローカル</span></div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-view="dash" class="active">ダッシュボード</button>
+      <button data-view="log">架電記録</button>
+      <button data-view="rank">ランキング</button>
+      <button data-view="analysis">分析</button>
+      <button data-view="appointer">アポインター</button>
+      <button data-view="settings">設定</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div id="demoBanner"></div>
+
+  <!-- DASHBOARD -->
+  <section class="view active" id="view-dash">
+    <div class="kpis" id="kpis"></div>
+    <div class="grid2">
+      <div class="card pad">
+        <div class="section-title">📅 フォロー予定<span class="tag" id="followCount"></span></div>
+        <div id="followList"></div>
+      </div>
+      <div class="card pad">
+        <div class="section-title">🕑 最近の架電</div>
+        <div id="recentList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOG -->
+  <section class="view" id="view-log">
+    <div class="grid2">
+      <div class="card pad">
+        <div class="section-title">📞 架電を記録<span class="tag">新規</span></div>
+        <form id="callForm">
+          <div class="field">
+            <label>アポインター（架電者）</label>
+            <select id="fAppointer" required></select>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>都道府県</label>
+              <select id="fPref" required></select>
+            </div>
+            <div class="field">
+              <label>架電日</label>
+              <input type="date" id="fDate" required>
+            </div>
+          </div>
+          <div class="field">
+            <label>施設カテゴリー</label>
+            <select id="fCategory" required></select>
+          </div>
+          <div class="field">
+            <label>施設・会場名</label>
+            <input type="text" id="fFacility" placeholder="道の駅◯◯／JA△△直売所 など" required>
+          </div>
+          <div class="row2">
+            <div class="field">
+              <label>電話番号</label>
+              <input type="tel" id="fPhone" placeholder="0000-00-0000">
+            </div>
+            <div class="field">
+              <label>結果</label>
+              <select id="fResult" required></select>
+            </div>
+          </div>
+          <div id="rejectBlock">
+            <div class="field" style="margin-bottom:10px">
+              <label>断られた理由</label>
+              <select id="fReject"></select>
+            </div>
+            <div class="field" style="margin-bottom:0">
+              <label>理由の補足（任意）</label>
+              <input type="text" id="fRejectNote" placeholder="具体的な状況をメモ">
+            </div>
+          </div>
+          <div class="field">
+            <label>次回架電予定日（フォロー用・任意）</label>
+            <input type="date" id="fNext">
+          </div>
+          <div class="field">
+            <label>メモ（任意）</label>
+            <textarea id="fMemo" placeholder="担当者名、感触、次アクションなど"></textarea>
+          </div>
+          <button type="submit" class="btn full">この架電を記録する</button>
+        </form>
+      </div>
+      <div class="card pad">
+        <div class="section-title">📋 架電一覧<span class="tag" id="logCount"></span></div>
+        <div class="filters">
+          <select id="filAppointer"><option value="">全アポインター</option></select>
+          <select id="filPref"><option value="">全都道府県</option></select>
+          <select id="filCategory"><option value="">全カテゴリー</option></select>
+          <select id="filResult"><option value="">全結果</option></select>
+          <input type="text" id="filSearch" placeholder="施設名で検索">
+        </div>
+        <div class="table-wrap">
+          <table id="logTable">
+            <thead>
+              <tr><th>日付</th><th>都道府県</th><th>施設</th><th>アポインター</th><th>結果</th><th></th></tr>
+            </thead>
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RANKING -->
+  <section class="view" id="view-rank">
+    <div class="rank-grid">
+      <div class="card rank-card">
+        <h3>📞 架電数ランキング</h3>
+        <div class="desc">たくさん電話をかけた人</div>
+        <div id="rankCalls"></div>
+      </div>
+      <div class="card rank-card">
+        <h3>🎯 アポ獲得ランキング</h3>
+        <div class="desc">成約（会場確保）を取った人</div>
+        <div id="rankWins"></div>
+      </div>
+      <div class="card rank-card">
+        <h3>🔥 成約率ランキング</h3>
+        <div class="desc">架電あたりの決定力（5件以上）</div>
+        <div id="rankRate"></div>
+      </div>
+    </div>
+    <div class="card pad">
+      <div class="section-title">📊 アポインター実績一覧</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>アポインター</th><th>架電数</th><th>アポ獲得</th><th>前向き</th><th>断り</th><th>成約率</th></tr>
+          </thead>
+          <tbody id="rankTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANALYSIS -->
+  <section class="view" id="view-analysis">
+    <div class="grid2" style="margin-bottom:18px">
+      <div class="card pad">
+        <div class="section-title">🚫 断られた理由の内訳</div>
+        <div class="bars" id="rejectBars"></div>
+      </div>
+      <div class="card pad">
+        <div class="section-title">🧭 結果の内訳</div>
+        <div class="bars" id="resultBars"></div>
+      </div>
+    </div>
+    <div class="card pad">
+      <div class="section-title">🗾 都道府県別の架電状況<span class="tag">攻略マップ</span></div>
+      <div class="pref-map" id="prefMap"></div>
+    </div>
+  </section>
+
+  <!-- APPOINTER -->
+  <section class="view" id="view-appointer">
+    <div class="card pad" style="max-width:620px">
+      <div class="section-title">👥 アポインター登録</div>
+      <div class="ap-add">
+        <input type="text" id="apName" placeholder="氏名を入力（例：小野田）">
+        <button class="btn" id="apAdd">追加</button>
+      </div>
+      <div class="ap-list" id="apList"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="view" id="view-settings">
+    <div class="card set-block">
+      <h3>☁️ データの保存先（JSONBin.io）</h3>
+      <p id="binStatus"></p>
+      <p>ファイル冒頭の <code>CONFIG</code> に <code>BIN_ID</code> と <code>API_KEY</code> を貼ると、チーム全員で同じデータを共有できます。未設定の場合はこのセッション内のみ保持されます。</p>
+    </div>
+    <div class="card set-block">
+      <h3>📤 データの書き出し・バックアップ</h3>
+      <p>報告・集計にはExcel（架電記録＋アポインター実績の2シート）、汎用にはCSV、丸ごと退避・復元にはJSONを使ってください。</p>
+      <div class="set-actions">
+        <button class="btn" id="expXlsx">Excelで書き出す（.xlsx）</button>
+        <button class="btn ghost" id="expCsv">CSVで書き出す</button>
+        <button class="btn ghost" id="expJson">JSONバックアップ</button>
+        <button class="btn ghost" id="impJsonBtn">JSONを読み込む</button>
+        <input type="file" id="impJson" accept=".json" style="display:none">
+      </div>
+    </div>
+    <div class="card set-block">
+      <h3>🧪 サンプルデータ</h3>
+      <p>操作を試すためのダミーデータを入れられます。本番運用前に必ず全削除してください。</p>
+      <div class="set-actions">
+        <button class="btn harvest" id="seedBtn">サンプルを入れる</button>
+        <button class="btn danger" id="clearBtn">全データを削除</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="credit">© 2026 <b>株式会社MONDOCOLO</b>　／　信州マルシェ 営業部</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CONFIG = {
+  BIN_ID: "",
+  API_KEY: "",
+  PASSWORD: ""
+};
+
+const REGIONS = [
+  ["北海道", ["北海道"]],
+  ["東北", ["青森県","岩手県","宮城県","秋田県","山形県","福島県"]],
+  ["関東", ["茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県"]],
+  ["甲信越", ["新潟県","山梨県","長野県"]],
+  ["北陸", ["富山県","石川県","福井県"]],
+  ["東海", ["岐阜県","静岡県","愛知県","三重県"]],
+  ["近畿", ["滋賀県","京都府","大阪府","兵庫県","奈良県","和歌山県"]],
+  ["中国", ["鳥取県","島根県","岡山県","広島県","山口県"]],
+  ["四国", ["徳島県","香川県","愛媛県","高知県"]],
+  ["九州・沖縄", ["福岡県","佐賀県","長崎県","熊本県","大分県","宮崎県","鹿児島県","沖縄県"]]
+];
+const REGION_COLOR = {
+  "北海道":"#4a7a9a","東北":"#5a8a6a","関東":"#c07a22","甲信越":"#1f5c40","北陸":"#7a6ab0",
+  "東海":"#b0603a","近畿":"#3a8a8a","中国":"#8a7a3a","四国":"#6a9a4a","九州・沖縄":"#b04a6a"
+};
+function prefRegion(pref){for(const [r,ps] of REGIONS){if(ps.includes(pref))return r}return ""}
+
+const RESULTS = [
+  ["seiyaku","◎ アポ獲得（成約）","st-seiyaku"],
+  ["positive","○ 前向き・再連絡","st-positive"],
+  ["consider","△ 検討中","st-consider"],
+  ["hold","保留（担当者不在）","st-hold"],
+  ["absent","不在・つながらず","st-absent"],
+  ["reject","× 断り","st-reject"],
+  ["na","対象外","st-na"]
+];
+function resultInfo(v){return RESULTS.find(r=>r[0]===v)||["","—","st-na"]}
+
+const CATEGORIES = ["道の駅","JA野菜直売所","その他直売所","マルシェイベント","その他"];
+
+const REJECTS = [
+  "スペース・会場の空きがない",
+  "既に他イベントで予定が埋まっている",
+  "出店料・予算が合わない",
+  "決裁者不在・社内検討が必要",
+  "エリア・客層が合わない",
+  "過去実施で効果が薄かった",
+  "担当者が関心なし",
+  "その他"
+];
+
+let state = {appointers:[], calls:[]};
+let usingCloud = false;
+let saveTimer = null;
+
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function todayStr(){const d=new Date();return d.toISOString().slice(0,10)}
+function fmtDate(s){if(!s)return"";const p=s.split("-");return p.length===3?`${p[1]}/${p[2]}`:s}
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1900)}
+
+async function loadState(){
+  if(CONFIG.BIN_ID && CONFIG.API_KEY){
+    try{
+      const r = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.BIN_ID}/latest`,{headers:{"X-Master-Key":CONFIG.API_KEY}});
+      if(r.ok){
+        const j = await r.json();
+        const rec = j.record||{};
+        state = {appointers:rec.appointers||[], calls:rec.calls||[]};
+        usingCloud = true;
+        setSync("ok","同期済み");
+        return;
+      }
+    }catch(e){}
+    setSync("local","接続失敗");
+  }else{
+    setSync("local","ローカル");
+  }
+  if(state.appointers.length===0 && state.calls.length===0) seedDemo();
+}
+
+async function saveState(){
+  if(!usingCloud){setSync("local","ローカル");return}
+  setSync("saving","保存中");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{
+      const r = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.BIN_ID}`,{
+        method:"PUT",
+        headers:{"Content-Type":"application/json","X-Master-Key":CONFIG.API_KEY},
+        body:JSON.stringify(state)
+      });
+      setSync(r.ok?"ok":"local", r.ok?"同期済み":"保存失敗");
+    }catch(e){setSync("local","保存失敗")}
+  }, 600);
+}
+
+function setSync(cls,text){
+  const s=document.getElementById("sync");
+  s.className="sync "+(cls==="ok"?"":cls);
+  document.getElementById("syncText").textContent=text;
+}
+
+function persist(){saveState();renderAll()}
+
+function seedDemo(){
+  const names=["小野田","田中","佐藤","鈴木"];
+  state.appointers = names.map(n=>({id:uid(),name:n,createdAt:todayStr()}));
+  const facs=[
+    ["長野県","道の駅 池田ハーブセンター","0261-62-1200"],
+    ["長野県","JA大北 直売所","0261-22-3000"],
+    ["新潟県","道の駅 マリンドリーム能生","025-566-3456"],
+    ["富山県","道の駅 カモンパーク新湊","0766-83-0111"],
+    ["山梨県","道の駅 富士川","0556-48-8700"],
+    ["神奈川県","JAはだの じばさんず","0463-70-2100"],
+    ["静岡県","道の駅 富士川楽座","0545-81-5555"],
+    ["石川県","道の駅 のとじま","0767-84-1701"],
+    ["長野県","道の駅 中条","026-268-3000"],
+    ["新潟県","JA越後ながおか 直売所","0258-33-1000"],
+    ["東京都","JA西東京 ファーマーズ","042-500-1000"],
+    ["山梨県","JA南アルプス市 直売所","055-282-6000"],
+    ["富山県","道の駅 KOKOくろべ","0765-32-5540"],
+    ["長野県","道の駅 安曇野松川","0261-62-9500"],
+    ["神奈川県","JAさがみ 直売所","046-238-0100"]
+  ];
+  const results=["seiyaku","positive","reject","absent","seiyaku","consider","reject","positive","hold","seiyaku","absent","positive","reject","consider","seiyaku"];
+  const base=new Date();
+  state.calls = facs.map((f,i)=>{
+    const d=new Date(base);d.setDate(d.getDate()-(15-i));
+    const res=results[i];
+    const cat=f[1].includes("道の駅")?"道の駅":(f[1].includes("JA")?"JA野菜直売所":"その他直売所");
+    const c={
+      id:uid(),
+      appointerId:state.appointers[i%4].id,
+      pref:f[0], category:cat, facility:f[1], phone:f[2],
+      date:d.toISOString().slice(0,10),
+      result:res,
+      rejectReason:res==="reject"?REJECTS[i%REJECTS.length]:"",
+      rejectNote:"",
+      nextDate:(res==="positive"||res==="hold")?new Date(base.getTime()+((i%5)-2)*86400000).toISOString().slice(0,10):"",
+      memo:"",
+      createdAt:new Date().toISOString()
+    };
+    return c;
+  });
+}
+
+/* ---------- populate selects ---------- */
+function buildPrefSelect(sel, includeAll){
+  sel.innerHTML = includeAll ? '<option value="">全都道府県</option>' : '<option value="" disabled selected>選択してください</option>';
+  for(const [region,prefs] of REGIONS){
+    const og=document.createElement("optgroup");og.label=region;
+    for(const p of prefs){const o=document.createElement("option");o.value=p;o.textContent=p;og.appendChild(o)}
+    sel.appendChild(og);
+  }
+}
+function buildResultSelect(sel){
+  sel.innerHTML='<option value="" disabled selected>選択してください</option>';
+  for(const [v,l] of RESULTS){const o=document.createElement("option");o.value=v;o.textContent=l;sel.appendChild(o)}
+}
+function buildRejectSelect(sel){
+  sel.innerHTML="";
+  for(const r of REJECTS){const o=document.createElement("option");o.value=r;o.textContent=r;sel.appendChild(o)}
+}
+function refreshAppointerSelects(){
+  const opts = state.appointers.map(a=>`<option value="${a.id}">${a.name}</option>`).join("");
+  const f=document.getElementById("fAppointer");
+  const cur=f.value;
+  f.innerHTML='<option value="" disabled selected>選択してください</option>'+opts;
+  if(cur)f.value=cur;
+  const fil=document.getElementById("filAppointer");
+  const fcur=fil.value;
+  fil.innerHTML='<option value="">全アポインター</option>'+opts;
+  fil.value=fcur;
+}
+function apName(id){const a=state.appointers.find(x=>x.id===id);return a?a.name:"—"}
+
+/* ---------- dashboard ---------- */
+function renderDashboard(){
+  const calls=state.calls;
+  const total=calls.length;
+  const wins=calls.filter(c=>c.result==="seiyaku").length;
+  const rate=total?Math.round(wins/total*1000)/10:0;
+  const today=calls.filter(c=>c.date===todayStr()).length;
+  const kpis=[
+    {label:"総架電数",num:total,unit:"件",foot:"これまでの累計",cls:"accent"},
+    {label:"アポ獲得（成約）",num:wins,unit:"件",foot:"確保できた会場数",cls:"harvest"},
+    {label:"成約率",num:rate,unit:"%",foot:"架電あたりの決定率",cls:"accent"},
+    {label:"本日の架電",num:today,unit:"件",foot:todayStr(),cls:"mute"}
+  ];
+  document.getElementById("kpis").innerHTML=kpis.map(k=>`
+    <div class="card kpi ${k.cls}"><span class="bar"></span>
+      <div class="label">${k.label}</div>
+      <div class="num">${k.num}<span class="unit">${k.unit}</span></div>
+      <div class="foot">${k.foot}</div>
+    </div>`).join("");
+
+  const follows=calls.filter(c=>c.nextDate && c.result!=="seiyaku" && c.result!=="na" && c.result!=="reject")
+    .sort((a,b)=>a.nextDate.localeCompare(b.nextDate));
+  document.getElementById("followCount").textContent=follows.length+"件";
+  const fl=document.getElementById("followList");
+  if(follows.length===0){fl.innerHTML='<div class="empty">フォロー予定はありません</div>'}
+  else{
+    fl.innerHTML=follows.slice(0,8).map(c=>{
+      const over=c.nextDate<todayStr();
+      return `<div class="followrow">
+        <div class="fdate ${over?'over':''}">${fmtDate(c.nextDate)}</div>
+        <div class="fmain"><b>${c.facility}</b><div class="fmeta">${c.pref}・${apName(c.appointerId)}${over?' ・期限切れ':''}</div></div>
+      </div>`}).join("");
+  }
+
+  const recent=[...calls].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,8);
+  const rl=document.getElementById("recentList");
+  if(recent.length===0){rl.innerHTML='<div class="empty">まだ記録がありません</div>'}
+  else{
+    rl.innerHTML=recent.map(c=>{
+      const ri=resultInfo(c.result);
+      return `<div class="followrow">
+        <div class="fmain"><b>${c.facility}</b><div class="fmeta">${fmtDate(c.date)}・${c.pref}・${apName(c.appointerId)}</div></div>
+        <span class="status ${ri[2]}">${ri[1]}</span>
+      </div>`}).join("");
+  }
+}
+
+/* ---------- log ---------- */
+function renderLog(){
+  document.getElementById("logCount").textContent=state.calls.length+"件";
+  const fa=document.getElementById("filAppointer").value;
+  const fp=document.getElementById("filPref").value;
+  const fcat=document.getElementById("filCategory").value;
+  const fr=document.getElementById("filResult").value;
+  const fs=document.getElementById("filSearch").value.trim();
+  let rows=[...state.calls].sort((a,b)=>b.date.localeCompare(a.date)||(b.createdAt||"").localeCompare(a.createdAt||""));
+  if(fa)rows=rows.filter(c=>c.appointerId===fa);
+  if(fp)rows=rows.filter(c=>c.pref===fp);
+  if(fcat)rows=rows.filter(c=>c.category===fcat);
+  if(fr)rows=rows.filter(c=>c.result===fr);
+  if(fs)rows=rows.filter(c=>c.facility.includes(fs));
+  const body=document.getElementById("logBody");
+  if(rows.length===0){body.innerHTML='<tr><td colspan="6"><div class="empty">該当する架電記録はありません</div></td></tr>';return}
+  body.innerHTML=rows.map(c=>{
+    const ri=resultInfo(c.result);
+    const region=prefRegion(c.pref);
+    const col=REGION_COLOR[region]||"#999";
+    const sub=c.result==="reject"&&c.rejectReason?`<div class="fmeta" style="font-size:11px;color:var(--bad)">└ ${c.rejectReason}</div>`:
+              (c.memo?`<div class="fmeta" style="font-size:11px;color:var(--mute)">${c.memo}</div>`:"");
+    return `<tr>
+      <td>${fmtDate(c.date)}</td>
+      <td><span class="pref-chip" style="background:${col}1a;color:${col}">${c.pref}</span></td>
+      <td>${c.category?`<span class="cat-chip">${c.category}</span><br>`:""}<b>${c.facility}</b>${c.phone?`<div class="fmeta" style="font-size:11px;color:var(--mute)">${c.phone}</div>`:""}${sub}</td>
+      <td>${apName(c.appointerId)}</td>
+      <td><span class="status ${ri[2]}">${ri[1]}</span></td>
+      <td><button class="rowdel" data-del="${c.id}" title="削除">×</button></td>
+    </tr>`}).join("");
+  body.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
+    if(confirm("この架電記録を削除しますか？")){
+      state.calls=state.calls.filter(c=>c.id!==b.dataset.del);persist();
+    }
+  });
+}
+
+/* ---------- rankings ---------- */
+function appointerStats(){
+  return state.appointers.map(a=>{
+    const cs=state.calls.filter(c=>c.appointerId===a.id);
+    const total=cs.length;
+    const wins=cs.filter(c=>c.result==="seiyaku").length;
+    const pos=cs.filter(c=>c.result==="positive").length;
+    const rej=cs.filter(c=>c.result==="reject").length;
+    const rate=total?wins/total*100:0;
+    return {name:a.name,total,wins,pos,rej,rate};
+  });
+}
+function renderRankList(el,arr,valFn,cls){
+  if(arr.length===0){el.innerHTML='<div class="empty">データがありません</div>';return}
+  el.innerHTML=arr.map((s,i)=>`
+    <div class="rank-item">
+      <div class="medal ${i<3?'g'+(i+1):''}">${i+1}</div>
+      <div class="rname">${s.name}</div>
+      <div class="rval ${cls||''}">${valFn(s)}</div>
+    </div>`).join("");
+}
+function renderRankings(){
+  const stats=appointerStats();
+  renderRankList(document.getElementById("rankCalls"),
+    [...stats].sort((a,b)=>b.total-a.total).slice(0,8), s=>`${s.total}<small> 件</small>`);
+  renderRankList(document.getElementById("rankWins"),
+    [...stats].sort((a,b)=>b.wins-a.wins).slice(0,8), s=>`${s.wins}<small> 件</small>`);
+  renderRankList(document.getElementById("rankRate"),
+    [...stats].filter(s=>s.total>=5).sort((a,b)=>b.rate-a.rate).slice(0,8),
+    s=>`${Math.round(s.rate*10)/10}<small> %</small>`);
+
+  const table=document.getElementById("rankTable");
+  const sorted=[...stats].sort((a,b)=>b.wins-a.wins||b.total-a.total);
+  table.innerHTML=sorted.length? sorted.map(s=>`
+    <tr>
+      <td><b>${s.name}</b></td>
+      <td>${s.total}</td>
+      <td style="color:var(--ok);font-weight:700">${s.wins}</td>
+      <td>${s.pos}</td>
+      <td style="color:var(--bad)">${s.rej}</td>
+      <td><b>${Math.round(s.rate*10)/10}%</b></td>
+    </tr>`).join("") : '<tr><td colspan="6"><div class="empty">アポインターを登録してください</div></td></tr>';
+}
+
+/* ---------- analysis ---------- */
+function renderBars(el,pairs,cls){
+  const max=Math.max(1,...pairs.map(p=>p[1]));
+  if(pairs.every(p=>p[1]===0)){el.innerHTML='<div class="empty">データがありません</div>';return}
+  el.innerHTML=pairs.filter(p=>p[1]>0).sort((a,b)=>b[1]-a[1]).map(p=>`
+    <div class="bar-row">
+      <div class="bar-head"><span>${p[0]}</span><span class="bv">${p[1]}件</span></div>
+      <div class="track"><div class="fill ${cls||''}" style="width:${p[1]/max*100}%"></div></div>
+    </div>`).join("");
+}
+function renderAnalysis(){
+  const rejCounts=REJECTS.map(r=>[r, state.calls.filter(c=>c.result==="reject"&&c.rejectReason===r).length]);
+  renderBars(document.getElementById("rejectBars"),rejCounts,"r");
+  const resCounts=RESULTS.map(r=>[r[1].replace(/^[◎○△×]\s?/,""), state.calls.filter(c=>c.result===r[0]).length]);
+  renderBars(document.getElementById("resultBars"),resCounts,"");
+
+  const map=document.getElementById("prefMap");
+  map.innerHTML=REGIONS.map(([region,prefs])=>{
+    const cells=prefs.map(p=>{
+      const n=state.calls.filter(c=>c.pref===p).length;
+      return `<div class="pref-cell ${n>0?'hit':''}"><b>${p.replace(/[都道府県]$/,"")}</b>${n>0?`<span class="cnt">${n}</span>`:""}</div>`;
+    }).join("");
+    const total=prefs.reduce((s,p)=>s+state.calls.filter(c=>c.pref===p).length,0);
+    return `<div class="pref-region"><h4>${region}（${total}件）</h4><div class="pref-cells">${cells}</div></div>`;
+  }).join("");
+}
+
+/* ---------- appointers ---------- */
+function renderAppointers(){
+  const list=document.getElementById("apList");
+  if(state.appointers.length===0){list.innerHTML='<div class="empty">まだ登録がありません。氏名を入力して追加してください。</div>';return}
+  list.innerHTML=state.appointers.map(a=>{
+    const cnt=state.calls.filter(c=>c.appointerId===a.id).length;
+    return `<div class="ap-row">
+      <div class="av">${a.name.slice(0,1)}</div>
+      <div class="an">${a.name}</div>
+      <div class="as">架電 ${cnt}件</div>
+      <button class="rowdel" data-apdel="${a.id}" title="削除">×</button>
+    </div>`}).join("");
+  list.querySelectorAll("[data-apdel]").forEach(b=>b.onclick=()=>{
+    const cnt=state.calls.filter(c=>c.appointerId===b.dataset.apdel).length;
+    const msg=cnt>0?`このアポインターには架電記録が${cnt}件あります。削除しても記録は残りますが表示名が「—」になります。削除しますか？`:"このアポインターを削除しますか？";
+    if(confirm(msg)){state.appointers=state.appointers.filter(a=>a.id!==b.dataset.apdel);persist()}
+  });
+}
+
+/* ---------- settings ---------- */
+function renderSettings(){
+  const s=document.getElementById("binStatus");
+  s.innerHTML = usingCloud
+    ? `現在 <b style="color:var(--ok)">JSONBin.ioに接続中</b>（Bin ID: ${CONFIG.BIN_ID.slice(0,6)}…）。データは自動同期されます。`
+    : `現在 <b style="color:var(--warn)">未接続（ローカルモード）</b>。設定するとチームで共有できます。`;
+  const demo=document.getElementById("demoBanner");
+  demo.innerHTML = (!usingCloud)
+    ? '<div class="badge-demo">🧪 ローカルモードです。データはこのセッション内のみ保持されます。共有・永続化するには設定タブでJSONBin.ioを接続してください。</div>'
+    : "";
+}
+
+/* ---------- render all ---------- */
+function renderAll(){
+  refreshAppointerSelects();
+  renderDashboard();
+  renderLog();
+  renderRankings();
+  renderAnalysis();
+  renderAppointers();
+  renderSettings();
+}
+
+/* ---------- CSV / JSON ---------- */
+function exportCsv(){
+  const head=["架電日","地域","都道府県","カテゴリー","施設名","電話番号","アポインター","結果","断り理由","理由補足","次回予定","メモ"];
+  const lines=[head.join(",")];
+  [...state.calls].sort((a,b)=>a.date.localeCompare(b.date)).forEach(c=>{
+    const row=[c.date,prefRegion(c.pref),c.pref,c.category||"",c.facility,c.phone||"",apName(c.appointerId),resultInfo(c.result)[1],c.rejectReason||"",c.rejectNote||"",c.nextDate||"",(c.memo||"").replace(/\n/g," ")];
+    lines.push(row.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(","));
+  });
+  download("\uFEFF"+lines.join("\n"),"teleapo_"+todayStr()+".csv","text/csv");
+}
+function exportXlsx(){
+  if(typeof XLSX==="undefined"){toast("Excel機能の読み込みに失敗しました（通信環境をご確認ください）");return}
+  const head=["架電日","地域","都道府県","カテゴリー","施設名","電話番号","アポインター","結果","断り理由","理由補足","次回予定","メモ"];
+  const data=[head];
+  [...state.calls].sort((a,b)=>a.date.localeCompare(b.date)).forEach(c=>{
+    data.push([c.date,prefRegion(c.pref),c.pref,c.category||"",c.facility,c.phone||"",apName(c.appointerId),resultInfo(c.result)[1],c.rejectReason||"",c.rejectNote||"",c.nextDate||"",c.memo||""]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws["!cols"]=[{wch:11},{wch:9},{wch:9},{wch:14},{wch:26},{wch:14},{wch:11},{wch:16},{wch:22},{wch:20},{wch:11},{wch:24}];
+  ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:data.length-1,c:head.length-1}})};
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"架電記録");
+  const stats=[...appointerStats()].sort((a,b)=>b.wins-a.wins||b.total-a.total);
+  const sd=[["アポインター","架電数","アポ獲得","前向き","断り","成約率(%)"]];
+  stats.forEach(s=>sd.push([s.name,s.total,s.wins,s.pos,s.rej,Math.round(s.rate*10)/10]));
+  const ws2=XLSX.utils.aoa_to_sheet(sd);
+  ws2["!cols"]=[{wch:14},{wch:9},{wch:9},{wch:9},{wch:9},{wch:11}];
+  XLSX.utils.book_append_sheet(wb,ws2,"アポインター実績");
+  XLSX.writeFile(wb,"信州マルシェ_テレアポ_"+todayStr()+".xlsx");
+}
+function exportJson(){download(JSON.stringify(state,null,2),"teleapo_backup_"+todayStr()+".json","application/json")}
+function download(content,name,type){
+  const blob=new Blob([content],{type});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();URL.revokeObjectURL(a.href);
+}
+
+/* ---------- events ---------- */
+document.getElementById("tabs").addEventListener("click",e=>{
+  const b=e.target.closest("button");if(!b)return;
+  document.querySelectorAll("#tabs button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.getElementById("view-"+b.dataset.view).classList.add("active");
+});
+
+document.getElementById("fResult").addEventListener("change",e=>{
+  document.getElementById("rejectBlock").classList.toggle("show",e.target.value==="reject");
+});
+
+document.getElementById("callForm").addEventListener("submit",e=>{
+  e.preventDefault();
+  const result=document.getElementById("fResult").value;
+  const c={
+    id:uid(),
+    appointerId:document.getElementById("fAppointer").value,
+    pref:document.getElementById("fPref").value,
+    category:document.getElementById("fCategory").value,
+    facility:document.getElementById("fFacility").value.trim(),
+    phone:document.getElementById("fPhone").value.trim(),
+    date:document.getElementById("fDate").value,
+    result,
+    rejectReason:result==="reject"?document.getElementById("fReject").value:"",
+    rejectNote:result==="reject"?document.getElementById("fRejectNote").value.trim():"",
+    nextDate:document.getElementById("fNext").value,
+    memo:document.getElementById("fMemo").value.trim(),
+    createdAt:new Date().toISOString()
+  };
+  if(!c.appointerId){toast("アポインターを選択してください");return}
+  state.calls.push(c);
+  persist();
+  toast("架電を記録しました");
+  const keepAp=c.appointerId, keepDate=c.date;
+  e.target.reset();
+  document.getElementById("fAppointer").value=keepAp;
+  document.getElementById("fDate").value=keepDate;
+  document.getElementById("rejectBlock").classList.remove("show");
+});
+
+["filAppointer","filPref","filCategory","filResult","filSearch"].forEach(id=>{
+  document.getElementById(id).addEventListener("input",renderLog);
+});
+
+document.getElementById("apAdd").addEventListener("click",()=>{
+  const inp=document.getElementById("apName");
+  const name=inp.value.trim();
+  if(!name){toast("氏名を入力してください");return}
+  if(state.appointers.some(a=>a.name===name)){toast("同じ名前が既にあります");return}
+  state.appointers.push({id:uid(),name,createdAt:todayStr()});
+  inp.value="";persist();toast("アポインターを追加しました");
+});
+document.getElementById("apName").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("apAdd").click()});
+
+document.getElementById("expXlsx").onclick=exportXlsx;
+document.getElementById("expCsv").onclick=exportCsv;
+document.getElementById("expJson").onclick=exportJson;
+document.getElementById("impJsonBtn").onclick=()=>document.getElementById("impJson").click();
+document.getElementById("impJson").onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(!d.calls||!d.appointers)throw 0;
+      if(confirm("現在のデータを読み込んだ内容で置き換えます。よろしいですか？")){
+        state={appointers:d.appointers,calls:d.calls};persist();toast("読み込みました");
+      }
+    }catch(_){toast("読み込めませんでした")}
+  };
+  r.readAsText(f);e.target.value="";
+};
+document.getElementById("seedBtn").onclick=()=>{
+  if(state.calls.length>0 && !confirm("既存データにサンプルを追加します。よろしいですか？"))return;
+  seedDemo();persist();toast("サンプルデータを入れました");
+};
+document.getElementById("clearBtn").onclick=()=>{
+  if(confirm("すべてのアポインターと架電記録を削除します。元に戻せません。")){
+    state={appointers:[],calls:[]};persist();toast("全データを削除しました");
+  }
+};
+
+/* ---------- init ---------- */
+function initSelects(){
+  buildPrefSelect(document.getElementById("fPref"),false);
+  buildPrefSelect(document.getElementById("filPref"),true);
+  buildResultSelect(document.getElementById("fResult"));
+  buildRejectSelect(document.getElementById("fReject"));
+  const fr=document.getElementById("filResult");
+  fr.innerHTML='<option value="">全結果</option>'+RESULTS.map(r=>`<option value="${r[0]}">${r[1]}</option>`).join("");
+  document.getElementById("fCategory").innerHTML='<option value="" disabled selected>選択してください</option>'+CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join("");
+  document.getElementById("filCategory").innerHTML='<option value="">全カテゴリー</option>'+CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join("");
+  document.getElementById("fDate").value=todayStr();
+}
+async function boot(){
+  initSelects();
+  await loadState();
+  renderAll();
+}
+function startApp(){boot()}
+
+if(CONFIG.PASSWORD){
+  const gate=document.getElementById("gate");gate.style.display="flex";
+  const tryOpen=()=>{
+    if(document.getElementById("gateInput").value===CONFIG.PASSWORD){gate.style.display="none";startApp()}
+    else{document.getElementById("gateErr").textContent="パスワードが違います"}
+  };
+  document.getElementById("gateBtn").onclick=tryOpen;
+  document.getElementById("gateInput").addEventListener("keydown",e=>{if(e.key==="Enter")tryOpen()});
+}else{
+  startApp();
+}
+</script>
+</body>
+</html>
