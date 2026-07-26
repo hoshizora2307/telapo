@@ -46,7 +46,7 @@ a{color:var(--pine)}
 .gate-box button{width:100%;padding:11px;border:none;border-radius:10px;background:var(--pine);color:#fff;font-weight:700}
 .gate-err{color:var(--bad);font-size:12px;height:16px;margin-bottom:8px}
 
-header.top{background:linear-gradient(120deg,var(--pine),var(--pine-dark));color:#fff;padding:18px 22px 0}
+header.top{background:linear-gradient(120deg,var(--pine),var(--pine-dark));color:#fff;padding:18px 22px 0;position:sticky;top:0;z-index:50;box-shadow:0 4px 14px rgba(20,40,30,.12)}
 .top-inner{max-width:1180px;margin:0 auto}
 .brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .brand .mark{width:34px;height:34px;border-radius:9px;background:var(--harvest);display:flex;align-items:center;justify-content:center;font-size:19px;flex:0 0 auto}
@@ -404,11 +404,6 @@ footer.credit b{color:var(--ink-soft);font-weight:700;letter-spacing:.3px}
   <!-- SETTINGS -->
   <section class="view" id="view-settings">
     <div class="card set-block">
-      <h3>☁️ データの保存先（JSONBin.io）</h3>
-      <p id="binStatus"></p>
-      <p>ファイル冒頭の <code>CONFIG</code> に <code>BIN_ID</code> と <code>API_KEY</code> を貼ると、チーム全員で同じデータを共有できます。未設定の場合はこのセッション内のみ保持されます。</p>
-    </div>
-    <div class="card set-block">
       <h3>📤 データの書き出し・バックアップ</h3>
       <p>報告・集計にはExcel（架電記録＋アポインター実績の2シート）、汎用にはCSV、丸ごと退避・復元にはJSONを使ってください。</p>
       <div class="set-actions">
@@ -420,10 +415,9 @@ footer.credit b{color:var(--ink-soft);font-weight:700;letter-spacing:.3px}
       </div>
     </div>
     <div class="card set-block">
-      <h3>🧪 サンプルデータ</h3>
-      <p>操作を試すためのダミーデータを入れられます。本番運用前に必ず全削除してください。</p>
+      <h3>🗑️ データ削除</h3>
+      <p>すべての記録を消去します。元に戻せないため、必要ならば先にJSONバックアップを取ってください。</p>
       <div class="set-actions">
-        <button class="btn harvest" id="seedBtn">サンプルを入れる</button>
         <button class="btn danger" id="clearBtn">全データを削除</button>
       </div>
     </div>
@@ -510,7 +504,6 @@ async function loadState(){
   }else{
     setSync("local","ローカル");
   }
-  if(state.appointers.length===0 && state.calls.length===0) seedDemo();
 }
 
 async function saveState(){
@@ -537,47 +530,6 @@ function setSync(cls,text){
 
 function persist(){saveState();renderAll()}
 
-function seedDemo(){
-  const names=["小野田","田中","佐藤","鈴木"];
-  state.appointers = names.map(n=>({id:uid(),name:n,createdAt:todayStr()}));
-  const facs=[
-    ["長野県","道の駅 池田ハーブセンター","0261-62-1200"],
-    ["長野県","JA大北 直売所","0261-22-3000"],
-    ["新潟県","道の駅 マリンドリーム能生","025-566-3456"],
-    ["富山県","道の駅 カモンパーク新湊","0766-83-0111"],
-    ["山梨県","道の駅 富士川","0556-48-8700"],
-    ["神奈川県","JAはだの じばさんず","0463-70-2100"],
-    ["静岡県","道の駅 富士川楽座","0545-81-5555"],
-    ["石川県","道の駅 のとじま","0767-84-1701"],
-    ["長野県","道の駅 中条","026-268-3000"],
-    ["新潟県","JA越後ながおか 直売所","0258-33-1000"],
-    ["東京都","JA西東京 ファーマーズ","042-500-1000"],
-    ["山梨県","JA南アルプス市 直売所","055-282-6000"],
-    ["富山県","道の駅 KOKOくろべ","0765-32-5540"],
-    ["長野県","道の駅 安曇野松川","0261-62-9500"],
-    ["神奈川県","JAさがみ 直売所","046-238-0100"]
-  ];
-  const results=["seiyaku","positive","reject","absent","seiyaku","consider","reject","positive","hold","seiyaku","absent","positive","reject","consider","seiyaku"];
-  const base=new Date();
-  state.calls = facs.map((f,i)=>{
-    const d=new Date(base);d.setDate(d.getDate()-(15-i));
-    const res=results[i];
-    const cat=f[1].includes("道の駅")?"道の駅":(f[1].includes("JA")?"JA野菜直売所":"その他直売所");
-    const c={
-      id:uid(),
-      appointerId:state.appointers[i%4].id,
-      pref:f[0], category:cat, facility:f[1], phone:f[2],
-      date:d.toISOString().slice(0,10),
-      result:res,
-      rejectReason:res==="reject"?REJECTS[i%REJECTS.length]:"",
-      rejectNote:"",
-      nextDate:(res==="positive"||res==="hold")?new Date(base.getTime()+((i%5)-2)*86400000).toISOString().slice(0,10):"",
-      memo:"",
-      createdAt:new Date().toISOString()
-    };
-    return c;
-  });
-}
 
 /* ---------- populate selects ---------- */
 function buildPrefSelect(sel, includeAll){
@@ -796,13 +748,9 @@ function renderAppointers(){
 
 /* ---------- settings ---------- */
 function renderSettings(){
-  const s=document.getElementById("binStatus");
-  s.innerHTML = usingCloud
-    ? `現在 <b style="color:var(--ok)">JSONBin.ioに接続中</b>（Bin ID: ${CONFIG.BIN_ID.slice(0,6)}…）。データは自動同期されます。`
-    : `現在 <b style="color:var(--warn)">未接続（ローカルモード）</b>。設定するとチームで共有できます。`;
   const demo=document.getElementById("demoBanner");
   demo.innerHTML = (!usingCloud)
-    ? '<div class="badge-demo">🧪 ローカルモードです。データはこのセッション内のみ保持されます。共有・永続化するには設定タブでJSONBin.ioを接続してください。</div>'
+    ? '<div class="badge-demo">⚠️ 未接続（ローカルモード）です。データはこの画面内のみで保持され、共有・保存されません。</div>'
     : "";
 }
 
@@ -979,10 +927,6 @@ document.getElementById("impJson").onchange=e=>{
     }catch(_){toast("読み込めませんでした")}
   };
   r.readAsText(f);e.target.value="";
-};
-document.getElementById("seedBtn").onclick=()=>{
-  if(state.calls.length>0 && !confirm("既存データにサンプルを追加します。よろしいですか？"))return;
-  seedDemo();persist();toast("サンプルデータを入れました");
 };
 document.getElementById("clearBtn").onclick=()=>{
   if(confirm("すべてのアポインターと架電記録を削除します。元に戻せません。")){
