@@ -135,6 +135,20 @@ tr:hover td{background:#fafcfa}
 .st-na{background:#ececec;color:#8a8a8a}
 .rowdel{color:var(--mute);border:none;background:none;font-size:15px;padding:2px 6px;border-radius:6px}
 .rowdel:hover{background:#f7e1dc;color:var(--bad)}
+.rowedit{color:var(--pine);border:1px solid var(--line);background:#fff;font-size:11px;font-weight:700;padding:4px 10px;border-radius:7px}
+.rowedit:hover{background:var(--pine-soft)}
+.calllist{display:flex;flex-direction:column;gap:11px}
+.callcard{border:1px solid var(--line);border-radius:13px;padding:13px 15px;background:#fff;transition:.15s}
+.callcard:hover{border-color:#cdd8cf;box-shadow:var(--shadow)}
+.cc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.cc-date{font-size:13px;font-weight:800;color:var(--ink-soft)}
+.cc-actions{margin-left:auto;display:flex;align-items:center;gap:5px;flex:0 0 auto}
+.cc-name{font-size:16px;font-weight:700;line-height:1.4;word-break:break-word}
+.cc-phone{font-size:12.5px;color:var(--ink-soft);margin-top:3px}
+.cc-meta{font-size:12.5px;color:var(--ink-soft);margin-top:5px}
+.cc-reject{font-size:12.5px;color:var(--bad);margin-top:6px;word-break:break-word}
+.cc-memo{font-size:12.5px;color:var(--ink);margin-top:7px;background:var(--paper);border:1px solid var(--line-soft);border-radius:9px;padding:7px 10px;white-space:pre-wrap;word-break:break-word;line-height:1.6}
+.cc-next{font-size:12.5px;color:var(--harvest);font-weight:700;margin-top:6px}
 
 .rank-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:20px}
 .rank-card{padding:18px}
@@ -188,6 +202,10 @@ footer.credit b{color:var(--ink-soft);font-weight:700;letter-spacing:.3px}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;transition:.3s;z-index:200}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+.table-wrap table{min-width:520px}
+@media(max-width:640px){
+  .cc-name{font-size:15px}
+}
 @media(max-width:860px){
   .kpis{grid-template-columns:repeat(2,1fr)}
   .grid2{grid-template-columns:1fr}
@@ -251,7 +269,7 @@ footer.credit b{color:var(--ink-soft);font-weight:700;letter-spacing:.3px}
   <section class="view" id="view-log">
     <div class="grid2">
       <div class="card pad">
-        <div class="section-title">📞 架電を記録<span class="tag">新規</span></div>
+        <div class="section-title">📞 架電を記録<span class="tag" id="formTag">新規</span></div>
         <form id="callForm">
           <div class="field">
             <label>アポインター（架電者）</label>
@@ -303,7 +321,8 @@ footer.credit b{color:var(--ink-soft);font-weight:700;letter-spacing:.3px}
             <label>メモ（任意）</label>
             <textarea id="fMemo" placeholder="担当者名、感触、次アクションなど"></textarea>
           </div>
-          <button type="submit" class="btn full">この架電を記録する</button>
+          <button type="submit" class="btn full" id="submitBtn">この架電を記録する</button>
+          <button type="button" class="btn ghost full" id="cancelEdit" style="display:none;margin-top:8px">編集をやめる</button>
         </form>
       </div>
       <div class="card pad">
@@ -315,14 +334,7 @@ footer.credit b{color:var(--ink-soft);font-weight:700;letter-spacing:.3px}
           <select id="filResult"><option value="">全結果</option></select>
           <input type="text" id="filSearch" placeholder="施設名で検索">
         </div>
-        <div class="table-wrap">
-          <table id="logTable">
-            <thead>
-              <tr><th>日付</th><th>都道府県</th><th>施設</th><th>アポインター</th><th>結果</th><th></th></tr>
-            </thead>
-            <tbody id="logBody"></tbody>
-          </table>
-        </div>
+        <div class="calllist" id="logBody"></div>
       </div>
     </div>
   </section>
@@ -474,6 +486,7 @@ const REJECTS = [
 let state = {appointers:[], calls:[]};
 let usingCloud = false;
 let saveTimer = null;
+let editingId = null;
 
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function todayStr(){const d=new Date();return d.toISOString().slice(0,10)}
@@ -658,21 +671,32 @@ function renderLog(){
   if(fr)rows=rows.filter(c=>c.result===fr);
   if(fs)rows=rows.filter(c=>c.facility.includes(fs));
   const body=document.getElementById("logBody");
-  if(rows.length===0){body.innerHTML='<tr><td colspan="6"><div class="empty">該当する架電記録はありません</div></td></tr>';return}
+  if(rows.length===0){body.innerHTML='<div class="empty">該当する架電記録はありません</div>';return}
   body.innerHTML=rows.map(c=>{
     const ri=resultInfo(c.result);
     const region=prefRegion(c.pref);
     const col=REGION_COLOR[region]||"#999";
-    const sub=c.result==="reject"&&c.rejectReason?`<div class="fmeta" style="font-size:11px;color:var(--bad)">└ ${c.rejectReason}</div>`:
-              (c.memo?`<div class="fmeta" style="font-size:11px;color:var(--mute)">${c.memo}</div>`:"");
-    return `<tr>
-      <td>${fmtDate(c.date)}</td>
-      <td><span class="pref-chip" style="background:${col}1a;color:${col}">${c.pref}</span></td>
-      <td>${c.category?`<span class="cat-chip">${c.category}</span><br>`:""}<b>${c.facility}</b>${c.phone?`<div class="fmeta" style="font-size:11px;color:var(--mute)">${c.phone}</div>`:""}${sub}</td>
-      <td>${apName(c.appointerId)}</td>
-      <td><span class="status ${ri[2]}">${ri[1]}</span></td>
-      <td><button class="rowdel" data-del="${c.id}" title="削除">×</button></td>
-    </tr>`}).join("");
+    const reject=c.result==="reject"&&c.rejectReason?`<div class="cc-reject">断り理由：${c.rejectReason}${c.rejectNote?`（${c.rejectNote}）`:""}</div>`:"";
+    const memo=c.memo?`<div class="cc-memo">${c.memo}</div>`:"";
+    const next=c.nextDate?`<div class="cc-next">次回架電予定：${fmtDate(c.nextDate)}</div>`:"";
+    const phone=c.phone?`<div class="cc-phone">${c.phone}</div>`:"";
+    return `<div class="callcard">
+      <div class="cc-top">
+        <span class="cc-date">${fmtDate(c.date)}</span>
+        <span class="pref-chip" style="background:${col}1a;color:${col}">${c.pref}</span>
+        ${c.category?`<span class="cat-chip">${c.category}</span>`:""}
+        <span class="status ${ri[2]}">${ri[1]}</span>
+        <div class="cc-actions">
+          <button class="rowedit" data-edit="${c.id}">編集</button>
+          <button class="rowdel" data-del="${c.id}" title="削除">×</button>
+        </div>
+      </div>
+      <div class="cc-name">${c.facility}</div>
+      ${phone}
+      <div class="cc-meta">担当：${apName(c.appointerId)}</div>
+      ${reject}${memo}${next}
+    </div>`}).join("");
+  body.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>startEdit(b.dataset.edit));
   body.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
     if(confirm("この架電記録を削除しますか？")){
       state.calls=state.calls.filter(c=>c.id!==b.dataset.del);persist();
@@ -830,23 +854,62 @@ function download(content,name,type){
 }
 
 /* ---------- events ---------- */
+function switchTab(view){
+  document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("active",x.dataset.view===view));
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  document.getElementById("view-"+view).classList.add("active");
+}
 document.getElementById("tabs").addEventListener("click",e=>{
   const b=e.target.closest("button");if(!b)return;
-  document.querySelectorAll("#tabs button").forEach(x=>x.classList.remove("active"));
-  b.classList.add("active");
-  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
-  document.getElementById("view-"+b.dataset.view).classList.add("active");
+  switchTab(b.dataset.view);
 });
 
 document.getElementById("fResult").addEventListener("change",e=>{
   document.getElementById("rejectBlock").classList.toggle("show",e.target.value==="reject");
 });
 
+function startEdit(id){
+  const c=state.calls.find(x=>x.id===id);
+  if(!c)return;
+  editingId=id;
+  document.getElementById("fAppointer").value=c.appointerId;
+  document.getElementById("fPref").value=c.pref;
+  document.getElementById("fCategory").value=c.category||"";
+  document.getElementById("fFacility").value=c.facility;
+  document.getElementById("fPhone").value=c.phone||"";
+  document.getElementById("fDate").value=c.date;
+  document.getElementById("fResult").value=c.result;
+  document.getElementById("rejectBlock").classList.toggle("show",c.result==="reject");
+  document.getElementById("fReject").value=c.rejectReason||REJECTS[0];
+  document.getElementById("fRejectNote").value=c.rejectNote||"";
+  document.getElementById("fNext").value=c.nextDate||"";
+  document.getElementById("fMemo").value=c.memo||"";
+  const tag=document.getElementById("formTag");
+  tag.textContent="編集中";tag.style.background="var(--harvest-soft)";tag.style.color="var(--harvest)";
+  document.getElementById("submitBtn").textContent="この内容で更新する";
+  document.getElementById("cancelEdit").style.display="block";
+  switchTab("log");
+  document.getElementById("callForm").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function exitEdit(){
+  editingId=null;
+  const tag=document.getElementById("formTag");
+  tag.textContent="新規";tag.style.background="";tag.style.color="";
+  document.getElementById("submitBtn").textContent="この架電を記録する";
+  document.getElementById("cancelEdit").style.display="none";
+}
+document.getElementById("cancelEdit").addEventListener("click",()=>{
+  const form=document.getElementById("callForm");
+  form.reset();
+  document.getElementById("fDate").value=todayStr();
+  document.getElementById("rejectBlock").classList.remove("show");
+  exitEdit();
+});
+
 document.getElementById("callForm").addEventListener("submit",e=>{
   e.preventDefault();
   const result=document.getElementById("fResult").value;
-  const c={
-    id:uid(),
+  const payload={
     appointerId:document.getElementById("fAppointer").value,
     pref:document.getElementById("fPref").value,
     category:document.getElementById("fCategory").value,
@@ -857,14 +920,28 @@ document.getElementById("callForm").addEventListener("submit",e=>{
     rejectReason:result==="reject"?document.getElementById("fReject").value:"",
     rejectNote:result==="reject"?document.getElementById("fRejectNote").value.trim():"",
     nextDate:document.getElementById("fNext").value,
-    memo:document.getElementById("fMemo").value.trim(),
-    createdAt:new Date().toISOString()
+    memo:document.getElementById("fMemo").value.trim()
   };
-  if(!c.appointerId){toast("アポインターを選択してください");return}
-  state.calls.push(c);
+  if(!payload.appointerId){toast("アポインターを選択してください");return}
+
+  if(editingId){
+    const idx=state.calls.findIndex(x=>x.id===editingId);
+    if(idx>=0){
+      state.calls[idx]={...state.calls[idx],...payload,updatedAt:new Date().toISOString()};
+    }
+    persist();
+    toast("記録を更新しました");
+    exitEdit();
+    e.target.reset();
+    document.getElementById("fDate").value=todayStr();
+    document.getElementById("rejectBlock").classList.remove("show");
+    return;
+  }
+
+  state.calls.push({...payload,id:uid(),createdAt:new Date().toISOString()});
   persist();
   toast("架電を記録しました");
-  const keepAp=c.appointerId, keepDate=c.date;
+  const keepAp=payload.appointerId, keepDate=payload.date;
   e.target.reset();
   document.getElementById("fAppointer").value=keepAp;
   document.getElementById("fDate").value=keepDate;
