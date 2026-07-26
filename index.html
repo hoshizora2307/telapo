@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>信州マルシェ テレアポ管理ボード ver 1.0</title>
+<title>信州マルシェ テレアポ管理ボード</title>
 <style>
 :root{
   --pine:#1f5c40;
@@ -149,6 +149,23 @@ tr:hover td{background:#fafcfa}
 .cc-reject{font-size:12.5px;color:var(--bad);margin-top:6px;word-break:break-word}
 .cc-memo{font-size:12.5px;color:var(--ink);margin-top:7px;background:var(--paper);border:1px solid var(--line-soft);border-radius:9px;padding:7px 10px;white-space:pre-wrap;word-break:break-word;line-height:1.6}
 .cc-next{font-size:12.5px;color:var(--harvest);font-weight:700;margin-top:6px}
+.dup-warn{display:none;margin-top:8px;font-size:12.5px;font-weight:700;color:var(--bad);background:#f7e1dc;border:1px solid #ecccc5;border-radius:9px;padding:8px 11px}
+.dup-warn.show{display:block}
+.venue-stats{display:flex;gap:22px;flex-wrap:wrap}
+.venue-stats .vs{display:flex;flex-direction:column}
+.venue-stats .vs b{font-size:26px;font-weight:800;color:var(--pine);line-height:1.1}
+.venue-stats .vs span{font-size:12px;color:var(--ink-soft);font-weight:600}
+.venue-stats .snap{margin-left:auto;font-size:11px;color:var(--mute);align-self:flex-end}
+.venue-list{display:flex;flex-direction:column;gap:9px}
+.venue-card{display:flex;align-items:center;gap:13px;border:1px solid var(--line);border-radius:12px;padding:12px 15px;background:#fff}
+.venue-card .vcount{flex:0 0 auto;min-width:44px;height:44px;border-radius:10px;background:var(--pine-soft);color:var(--pine);display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;line-height:1}
+.venue-card .vcount b{font-size:18px}
+.venue-card .vcount small{font-size:9px;font-weight:700}
+.venue-card.multi .vcount{background:var(--harvest-soft);color:var(--harvest)}
+.venue-card .vmain{flex:1;min-width:0}
+.venue-card .vname{font-size:14.5px;font-weight:700;word-break:break-word}
+.venue-card .vmeta{font-size:12px;color:var(--ink-soft);margin-top:3px}
+.venue-card .vpref{font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;flex:0 0 auto}
 
 .rank-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:20px}
 .rank-card{padding:18px}
@@ -241,6 +258,7 @@ footer.credit b{color:var(--ink-soft);font-weight:700;letter-spacing:.3px}
       <button data-view="log">架電記録</button>
       <button data-view="rank">ランキング</button>
       <button data-view="analysis">分析</button>
+      <button data-view="venues">開催済み施設</button>
       <button data-view="appointer">アポインター</button>
       <button data-view="settings">設定</button>
     </nav>
@@ -292,6 +310,7 @@ footer.credit b{color:var(--ink-soft);font-weight:700;letter-spacing:.3px}
           <div class="field">
             <label>施設・会場名</label>
             <input type="text" id="fFacility" placeholder="道の駅◯◯／JA△△直売所 など" required>
+            <div id="dupWarn" class="dup-warn"></div>
           </div>
           <div class="row2">
             <div class="field">
@@ -389,6 +408,24 @@ footer.credit b{color:var(--ink-soft);font-weight:700;letter-spacing:.3px}
     </div>
   </section>
 
+  <!-- VENUES -->
+  <section class="view" id="view-venues">
+    <div class="card pad" style="margin-bottom:18px">
+      <div class="section-title">📍 開催済み施設<span class="tag">重複チェック</span></div>
+      <p style="font-size:13px;color:var(--ink-soft);margin:0 0 14px">過去に信州マルシェを開催した施設の一覧です。テレアポ前にここで確認すれば、開催済みの施設と重複せずに済みます。</p>
+      <div class="venue-stats" id="venueStats"></div>
+      <div class="filters" style="margin-top:14px;margin-bottom:0">
+        <select id="venuePref"><option value="">全都道府県</option></select>
+        <input type="text" id="venueSearch" placeholder="施設名で検索">
+        <select id="venueSort">
+          <option value="count">開催回数の多い順</option>
+          <option value="recent">最近開催した順</option>
+        </select>
+      </div>
+    </div>
+    <div class="venue-list" id="venueList"></div>
+  </section>
+
   <!-- APPOINTER -->
   <section class="view" id="view-appointer">
     <div class="card pad" style="max-width:620px">
@@ -465,6 +502,11 @@ const RESULTS = [
 function resultInfo(v){return RESULTS.find(r=>r[0]===v)||["","—","st-na"]}
 
 const CATEGORIES = ["道の駅","JA野菜直売所","その他直売所","マルシェイベント","その他"];
+
+const PAST_VENUES = [{"n":"道の駅 保田小学校","p":"千葉県","c":2,"d":["11/23","1/4"]},{"n":"道の駅多古あじさい館","p":"千葉県","c":2,"d":["1/17","3/28"]},{"n":"JA八千代市ファーマーズ『よったいよ』","p":"千葉県","c":2,"d":["1/18","3/1"]},{"n":"道の駅くりもと 紅小町の郷","p":"千葉県","c":2,"d":["2/22","2/23"]},{"n":"魚の駅 生地","p":"富山県","c":2,"d":["1/24","4/5"]},{"n":"風土記の丘","p":"山梨県","c":2,"d":["12/14","1/17"]},{"n":"道の駅 親不知ピアパーク","p":"新潟県","c":2,"d":["1/24","3/22"]},{"n":"道の駅たかねざわ元気あっぷ村","p":"栃木県","c":2,"d":["12/13","3/8"]},{"n":"道の駅清川","p":"神奈川県","c":2,"d":["11/30","2/14"]},{"n":"道の駅 おのこ","p":"群馬県","c":2,"d":["1/11","4/11"]},{"n":"道の駅たまつくり物産館こいこい","p":"茨城県","c":2,"d":["12/20","3/29"]},{"n":"JA水郷つくば農産物直売所サンフレッシュ土浦店","p":"茨城県","c":2,"d":["2/22","2/23"]},{"n":"JA直売所 すそのふれあい市","p":"静岡県","c":2,"d":["12/28","4/26"]},{"n":"道の駅グリーンファーム館山","p":"千葉県","c":1,"d":["11/23"]},{"n":"道の駅ちくら潮風王国","p":"千葉県","c":1,"d":["12/7"]},{"n":"JA八千代市ファーマーズ","p":"千葉県","c":1,"d":["12/7"]},{"n":"道の駅グリーンファーム舘山","p":"千葉県","c":1,"d":["1/3"]},{"n":"道の駅ながら","p":"千葉県","c":1,"d":["1/4"]},{"n":"JA西印旛とりたて産直館印西店","p":"千葉県","c":1,"d":["1/18"]},{"n":"道の駅おおつの里花倶楽部","p":"千葉県","c":1,"d":["2/15"]},{"n":"JAとうかつ中央ファーマーズマーケット さいてって","p":"千葉県","c":1,"d":["2/15"]},{"n":"JA直売所 農産物直売所「ふなっこ畑」","p":"千葉県","c":1,"d":["3/1"]},{"n":"JA直売所 とれたて産直館 印西店","p":"千葉県","c":1,"d":["3/15"]},{"n":"Una casita farm ユニモちはら台店","p":"千葉県","c":1,"d":["3/15"]},{"n":"スーパー富分 君津店","p":"千葉県","c":1,"d":["3/20"]},{"n":"生鮮スーパー富分のぞみ野店","p":"千葉県","c":1,"d":["3/20"]},{"n":"道の駅いちかわ","p":"千葉県","c":1,"d":["3/28"]},{"n":"スーパー富分 清見台店","p":"千葉県","c":1,"d":["4/18"]},{"n":"JA直売所 野菜畑 佐倉店","p":"千葉県","c":1,"d":["4/18"]},{"n":"道の駅童謡のふる里おおとね","p":"埼玉県","c":1,"d":["1/10"]},{"n":"道の駅かぞわたらせ","p":"埼玉県","c":1,"d":["1/10"]},{"n":"道の駅両神温泉薬師の湯","p":"埼玉県","c":1,"d":["2/28"]},{"n":"JA花園農産物直売所","p":"埼玉県","c":1,"d":["2/28"]},{"n":"魚の駅 生地 とれたて館","p":"富山県","c":1,"d":["3/22"]},{"n":"道の駅 まるごと射水","p":"富山県","c":1,"d":["4/4"]},{"n":"道の駅 たいら","p":"富山県","c":1,"d":["4/4"]},{"n":"道の駅 細入","p":"富山県","c":1,"d":["4/5"]},{"n":"道の駅 とみざわ","p":"山梨県","c":1,"d":["3/21"]},{"n":"道の駅可児ッテ CANITTE","p":"岐阜県","c":1,"d":["12/27"]},{"n":"マリンドリーム能生","p":"新潟県","c":1,"d":["12/30"]},{"n":"トピレックプラザ","p":"東京都","c":1,"d":["3/7"]},{"n":"信州上田物産館 UEDA Nerima BASE","p":"東京都","c":1,"d":["3/7"]},{"n":"道の駅八王子滝山","p":"東京都","c":1,"d":["4/19"]},{"n":"道の駅うつのみやろまんちっく村","p":"栃木県","c":1,"d":["12/13"]},{"n":"道の駅ばとう","p":"栃木県","c":1,"d":["2/1"]},{"n":"道の駅にしかた","p":"栃木県","c":1,"d":["2/1"]},{"n":"道の駅日光ニコニコ本陣","p":"栃木県","c":1,"d":["2/8"]},{"n":"道の駅どまんなかたぬま","p":"栃木県","c":1,"d":["2/8"]},{"n":"道の駅やいた","p":"栃木県","c":1,"d":["3/8"]},{"n":"江の島金魚","p":"神奈川県","c":1,"d":["11/30"]},{"n":"道の駅足柄金太郎のふるさと","p":"神奈川県","c":1,"d":["12/6"]},{"n":"漁港の駅","p":"神奈川県","c":1,"d":["12/6"]},{"n":"江ノ島金魚前PinkSunset軒先スペース","p":"神奈川県","c":1,"d":["2/14"]},{"n":"道の駅しもにた","p":"群馬県","c":1,"d":["1/11"]},{"n":"峠の釜めし 荻野屋 横川店","p":"群馬県","c":1,"d":["1/12"]},{"n":"道の駅 みなかみ水紀行館","p":"群馬県","c":1,"d":["4/11"]},{"n":"道の駅 おおた","p":"群馬県","c":1,"d":["4/12"]},{"n":"道の駅 上州おにし","p":"群馬県","c":1,"d":["4/12"]},{"n":"道の駅いたこ","p":"茨城県","c":1,"d":["12/20"]},{"n":"グランテラス筑西","p":"茨城県","c":1,"d":["12/21"]},{"n":"道の駅日立おさかなセンター","p":"茨城県","c":1,"d":["12/21"]},{"n":"空のえき そ・ら・ら","p":"茨城県","c":1,"d":["2/7"]},{"n":"道の駅グランテラス筑西","p":"茨城県","c":1,"d":["2/7"]},{"n":"道の駅 まくらがの里こが","p":"茨城県","c":1,"d":["2/21"]},{"n":"道の駅 かさま","p":"茨城県","c":1,"d":["2/21"]},{"n":"JA水戸 さくら直売所","p":"茨城県","c":1,"d":["3/14"]},{"n":"JA水戸 フレッシュさかど","p":"茨城県","c":1,"d":["3/14"]},{"n":"マイアミショッピングセンター","p":"茨城県","c":1,"d":["3/29"]},{"n":"とよおかマルシェ祭り","p":"長野県","c":1,"d":["11/24"]},{"n":"峠の釜めし 荻野屋諏訪店","p":"長野県","c":1,"d":["11/29"]},{"n":"無印良品穂高","p":"長野県","c":1,"d":["11/29"]},{"n":"道の駅 木曽福島","p":"長野県","c":1,"d":["12/18"]},{"n":"麻績の里","p":"長野県","c":1,"d":["12/27"]},{"n":"COSCO富士見店","p":"長野県","c":1,"d":["12/31"]},{"n":"道の駅 八千穂高原","p":"長野県","c":1,"d":["1/12"]},{"n":"キラヤ 上飯田店","p":"長野県","c":1,"d":["1/31"]},{"n":"道の駅 田切の里","p":"長野県","c":1,"d":["1/31"]},{"n":"道の駅白馬","p":"長野県","c":1,"d":["2/11"]},{"n":"道の駅松川","p":"長野県","c":1,"d":["2/11"]},{"n":"道の駅すばしり","p":"静岡県","c":1,"d":["12/14"]},{"n":"JA直売所 長泉産直市","p":"静岡県","c":1,"d":["1/25"]},{"n":"JA直売所 KAU～ら","p":"静岡県","c":1,"d":["1/25"]},{"n":"JAふじ伊豆ファーマーズマーケット う宮～な","p":"静岡県","c":1,"d":["3/21"]},{"n":"JA直売所 金岡産直市","p":"静岡県","c":1,"d":["4/26"]}];
+const VENUE_SNAPSHOT = "2026/07/27";
+function normVenue(s){return (s||"").replace(/[\s　『』「」]/g,"").toLowerCase()}
+function matchPastVenue(name){const k=normVenue(name);if(!k)return null;for(const v of PAST_VENUES){const vk=normVenue(v.n);if(vk===k)return v;if(k.length>=4&&(vk.includes(k)||k.includes(vk)))return v}return null}
 
 const REJECTS = [
   "スペース・会場の空きがない",
@@ -747,6 +789,52 @@ function renderAppointers(){
 }
 
 /* ---------- settings ---------- */
+function venueYear(md){return parseInt(md.split("/")[0],10)>7?2025:2026}
+function venueDateVal(md){const p=md.split("/");return venueYear(md)*10000+parseInt(p[0],10)*100+parseInt(p[1],10)}
+function fmtVenueDate(md){const p=md.split("/");return venueYear(md)+"/"+p[0]+"/"+p[1]}
+function renderVenues(){
+  const stats=document.getElementById("venueStats");
+  const totalEvents=PAST_VENUES.reduce((s,v)=>s+v.c,0);
+  const multi=PAST_VENUES.filter(v=>v.c>1).length;
+  stats.innerHTML=`
+    <div class="vs"><b>${PAST_VENUES.length}</b><span>開催した施設数</span></div>
+    <div class="vs"><b>${totalEvents}</b><span>のべ開催回数</span></div>
+    <div class="vs"><b>${multi}</b><span>複数回の施設</span></div>
+    <div class="snap">${VENUE_SNAPSHOT} 時点</div>`;
+  const pref=document.getElementById("venuePref").value;
+  const q=(document.getElementById("venueSearch").value||"").trim().toLowerCase();
+  const sort=document.getElementById("venueSort").value;
+  let list=PAST_VENUES.slice();
+  if(pref)list=list.filter(v=>v.p===pref);
+  if(q)list=list.filter(v=>v.n.toLowerCase().includes(q));
+  const latest=v=>Math.max(...v.d.map(venueDateVal));
+  if(sort==="recent")list.sort((a,b)=>latest(b)-latest(a));
+  else list.sort((a,b)=>b.c-a.c||latest(b)-latest(a));
+  const el=document.getElementById("venueList");
+  if(list.length===0){el.innerHTML='<div class="empty">該当する施設はありません</div>';return}
+  el.innerHTML=list.map(v=>{
+    const col=REGION_COLOR[prefRegion(v.p)]||"#999";
+    const dates=v.d.slice().sort((a,b)=>venueDateVal(a)-venueDateVal(b)).map(fmtVenueDate).join("、");
+    return `<div class="venue-card ${v.c>1?'multi':''}">
+      <div class="vcount"><b>${v.c}</b><small>回</small></div>
+      <div class="vmain">
+        <div class="vname">${v.n}</div>
+        <div class="vmeta">開催日：${dates}</div>
+      </div>
+      <span class="vpref" style="background:${col}1a;color:${col}">${v.p}</span>
+    </div>`}).join("");
+}
+function checkDup(){
+  const w=document.getElementById("dupWarn");
+  const v=matchPastVenue(document.getElementById("fFacility").value);
+  if(v){
+    w.innerHTML=`⚠️ この施設は過去に <b>${v.c}回</b> 開催済みです（${v.p}・${v.d.join("、")}）。重複していないかご確認ください。`;
+    w.classList.add("show");
+  }else{
+    w.classList.remove("show");w.innerHTML="";
+  }
+}
+
 function renderSettings(){
   const demo=document.getElementById("demoBanner");
   demo.innerHTML = (!usingCloud)
@@ -761,6 +849,7 @@ function renderAll(){
   renderLog();
   renderRankings();
   renderAnalysis();
+  renderVenues();
   renderAppointers();
   renderSettings();
 }
@@ -824,6 +913,7 @@ function startEdit(id){
   document.getElementById("fPref").value=c.pref;
   document.getElementById("fCategory").value=c.category||"";
   document.getElementById("fFacility").value=c.facility;
+  checkDup();
   document.getElementById("fPhone").value=c.phone||"";
   document.getElementById("fDate").value=c.date;
   document.getElementById("fResult").value=c.result;
@@ -850,7 +940,7 @@ document.getElementById("cancelEdit").addEventListener("click",()=>{
   const form=document.getElementById("callForm");
   form.reset();
   document.getElementById("fDate").value=todayStr();
-  document.getElementById("rejectBlock").classList.remove("show");
+  document.getElementById("rejectBlock").classList.remove("show");document.getElementById("dupWarn").classList.remove("show");
   exitEdit();
 });
 
@@ -882,7 +972,7 @@ document.getElementById("callForm").addEventListener("submit",e=>{
     exitEdit();
     e.target.reset();
     document.getElementById("fDate").value=todayStr();
-    document.getElementById("rejectBlock").classList.remove("show");
+    document.getElementById("rejectBlock").classList.remove("show");document.getElementById("dupWarn").classList.remove("show");
     return;
   }
 
@@ -893,12 +983,16 @@ document.getElementById("callForm").addEventListener("submit",e=>{
   e.target.reset();
   document.getElementById("fAppointer").value=keepAp;
   document.getElementById("fDate").value=keepDate;
-  document.getElementById("rejectBlock").classList.remove("show");
+  document.getElementById("rejectBlock").classList.remove("show");document.getElementById("dupWarn").classList.remove("show");
 });
 
 ["filAppointer","filPref","filCategory","filResult","filSearch"].forEach(id=>{
   document.getElementById(id).addEventListener("input",renderLog);
 });
+document.getElementById("fFacility").addEventListener("input",checkDup);
+document.getElementById("venueSearch").addEventListener("input",renderVenues);
+document.getElementById("venuePref").addEventListener("change",renderVenues);
+document.getElementById("venueSort").addEventListener("change",renderVenues);
 
 document.getElementById("apAdd").addEventListener("click",()=>{
   const inp=document.getElementById("apName");
@@ -944,6 +1038,14 @@ function initSelects(){
   fr.innerHTML='<option value="">全結果</option>'+RESULTS.map(r=>`<option value="${r[0]}">${r[1]}</option>`).join("");
   document.getElementById("fCategory").innerHTML='<option value="" disabled selected>選択してください</option>'+CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join("");
   document.getElementById("filCategory").innerHTML='<option value="">全カテゴリー</option>'+CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join("");
+  const vp=document.getElementById("venuePref");
+  const present=new Set(PAST_VENUES.map(v=>v.p));
+  let vpHtml='<option value="">全都道府県</option>';
+  for(const [region,prefs] of REGIONS){
+    const inR=prefs.filter(p=>present.has(p));
+    if(inR.length)vpHtml+=`<optgroup label="${region}">`+inR.map(p=>`<option value="${p}">${p}</option>`).join("")+'</optgroup>';
+  }
+  vp.innerHTML=vpHtml;
   document.getElementById("fDate").value=todayStr();
 }
 async function boot(){
