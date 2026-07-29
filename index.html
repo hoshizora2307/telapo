@@ -51,6 +51,7 @@ header.top{background:linear-gradient(120deg,var(--pine),var(--pine-dark));color
 .brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .brand .mark{width:34px;height:34px;border-radius:9px;background:var(--harvest);display:flex;align-items:center;justify-content:center;font-size:19px;flex:0 0 auto}
 .brand h1{font-size:19px;letter-spacing:.5px}
+.brand h1 .ver{font-size:11px;font-weight:600;color:#cfe3d6;background:rgba(255,255,255,.15);padding:2px 8px;border-radius:20px;margin-left:9px;letter-spacing:.3px;vertical-align:middle;white-space:nowrap}
 .brand .sub{font-size:12px;color:#cfe3d6;font-weight:400}
 .sync{margin-left:auto;font-size:12px;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.12);padding:6px 11px;border-radius:20px}
 .sync .dot{width:8px;height:8px;border-radius:50%;background:#8fd6a8}
@@ -93,6 +94,17 @@ main{max-width:1180px;margin:0 auto;padding:24px 22px 60px}
 .followrow .fmain{flex:1;min-width:0}
 .followrow .fmain b{font-size:14px}
 .followrow .fmeta{font-size:12px;color:var(--ink-soft)}
+.followitem{border-bottom:1px solid var(--line-soft)}
+.followitem:last-child{border-bottom:none}
+.followitem .followrow{border-bottom:none;cursor:pointer;user-select:none}
+.followitem .followrow:hover{opacity:.85}
+.fchevron{color:var(--mute);font-size:11px;transition:transform .2s;flex:0 0 auto}
+.followitem.open .fchevron{transform:rotate(180deg)}
+.fdetail{display:none;padding:2px 0 12px 0}
+.followitem.open .fdetail{display:block;animation:fade .2s ease}
+.fd-row{font-size:12.5px;color:var(--ink-soft);display:flex;gap:8px;margin-bottom:3px}
+.fd-row span{flex:0 0 40px;font-weight:700;color:var(--mute)}
+.fd-memo{font-size:12.5px;color:var(--ink);background:var(--paper);border:1px solid var(--line-soft);border-radius:9px;padding:8px 10px;margin-top:5px;white-space:pre-wrap;word-break:break-word;line-height:1.6}
 .empty{color:var(--mute);font-size:13px;padding:18px 0;text-align:center}
 
 form .field{margin-bottom:14px}
@@ -248,7 +260,7 @@ footer.credit b{color:var(--ink-soft);font-weight:700;letter-spacing:.3px}
     <div class="brand">
       <div class="mark">🏔️</div>
       <div>
-        <h1>信州マルシェ テレアポ管理ボード</h1>
+        <h1>信州マルシェ テレアポ管理ボード<span class="ver">ver.1.1</span></h1>
         <div class="sub">株式会社MONDOCOLO 営業部 ／ 会場獲得コール</div>
       </div>
       <div class="sync local" id="sync"><span class="dot"></span><span id="syncText">ローカル</span></div>
@@ -631,10 +643,21 @@ function renderDashboard(){
   else{
     fl.innerHTML=follows.slice(0,8).map(c=>{
       const over=c.nextDate<todayStr();
-      return `<div class="followrow">
-        <div class="fdate ${over?'over':''}">${fmtDate(c.nextDate)}</div>
-        <div class="fmain"><b>${c.facility}</b><div class="fmeta">${c.pref}・${apName(c.appointerId)}${over?' ・期限切れ':''}</div></div>
+      const ri=resultInfo(c.result);
+      const detail=[
+        c.phone?`<div class="fd-row"><span>電話</span>${c.phone}</div>`:"",
+        `<div class="fd-row"><span>結果</span>${ri[1]}</div>`,
+        `<div class="fd-memo">${c.memo?c.memo:"（メモはありません）"}</div>`
+      ].join("");
+      return `<div class="followitem">
+        <div class="followrow fexp">
+          <div class="fdate ${over?'over':''}">${fmtDate(c.nextDate)}</div>
+          <div class="fmain"><b>${c.facility}</b><div class="fmeta">${c.pref}・${apName(c.appointerId)}${over?' ・期限切れ':''}</div></div>
+          <span class="fchevron">▾</span>
+        </div>
+        <div class="fdetail">${detail}</div>
       </div>`}).join("");
+    fl.querySelectorAll(".fexp").forEach(row=>row.onclick=()=>row.parentElement.classList.toggle("open"));
   }
 
   const recent=[...calls].sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||"")).slice(0,8);
